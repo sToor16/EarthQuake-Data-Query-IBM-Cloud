@@ -1,0 +1,18 @@
+{% include 'common.html' %}
+
+<form action="clusturingExecute" method="get">
+    <input  name="lmag" placeholder="lower magnitude">
+    <input  name="hmag" placeholder="higher magnitude">
+    <input  name="interval" placeholder="interval">
+    <input type="submit" value="Get Time" class="w3-red w3-button">
+</form>
+
+{% if error %}
+    {{ error }}
+{% endif %}
+{% if result_dict %}
+    {% for key in result_dict %}
+        <span>For </span>{{ key }}
+        <span>: number of earthquakes were: </span>{{ result_dict[key] }}<br>
+    {% endfor %}
+{% endif %}

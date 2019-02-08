@@ -1,6 +1,6 @@
 applications:
   - path: .
-    name: storageQuery2019
+    name: EarthQuakeCA2
     environment_json: {}
     memory: 256M
     instances: 1
