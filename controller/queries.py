@@ -1,3 +1,4 @@
+# -- coding: utf-8 --
 from flask import Blueprint, render_template, request
 import ibm_db_dbi as db
 from config import DB_CONNECTION_STRING
@@ -6,23 +7,17 @@ from datetime import datetime
 import timezonefinder, pytz
 from geopy.distance import geodesic
 
+from util_functions import decdeg2dms_latitude, decdeg2dms_longitude, dms_to_dd
+
 queriesController = Blueprint('queriesController', __name__, template_folder='templates')
 
 
 @queriesController.route('/', methods=['GET'])
 def hello():
-
-    result = []
-    try:
-        conn = db.connect(DB_CONNECTION_STRING)
-        cursor = conn.cursor()
-        sql = '''SELECT COUNT(*) FROM QUAKES'''
-        cursor.execute(sql,)
-        result = cursor.fetchall()
-    except:
-        result.append("error try again")
-
-    print result
+    lat = decdeg2dms_latitude(32.735687)
+    long = decdeg2dms_longitude(97.1080656)
+    print dms_to_dd(lat)
+    print dms_to_dd(long)
     return render_template('common.html')
 
 
@@ -40,9 +35,10 @@ def question6Execute():
     try:
         conn = db.connect(DB_CONNECTION_STRING)
         cursor = conn.cursor()
-        sql = '''SELECT "mag", "time" FROM EARTHQUAKE WHERE "mag" BETWEEN ? AND ?'''
+        sql = '''SELECT "mag", "time" FROM QUAKES WHERE "mag" BETWEEN ? AND ?'''
         cursor.execute(sql, (lmag, hmag))
         result = cursor.fetchall()
+        conn.close()
     except:
         result.append("error try again")
 
@@ -65,7 +61,7 @@ def question7Execute():
     try:
         conn = db.connect(DB_CONNECTION_STRING)
         cursor = conn.cursor()
-        sql = '''SELECT "place", "mag" FROM EARTHQUAKE 
+        sql = '''SELECT "place", "mag" FROM QUAKES 
         WHERE "latitude" BETWEEN ? AND ?
         AND "longitude"     BETWEEN ? AND ?
         ORDER BY "mag" DESC
@@ -103,7 +99,7 @@ def theoryExecute():
     except:
         result.append("error try again")
 
-    count = [0,0]
+    count = [0, 0]
 
     i = 0
     for r in result[:]:
@@ -138,68 +134,85 @@ def clusturing():
 
 @queriesController.route('/clusturingExecute', methods=['GET'])
 def clusturingExecute():
-    lmag = request.args['lmag']
-    hmag = request.args['hmag']
+    lmag = float(request.args['lmag'])
+    hmag = float(request.args['hmag'])
     interval = request.args['interval']
 
     interval = float(interval)
     interval = round(interval, 2)
 
     error = ""
+    result = []
+
+    result_dict = OrderedDict()
+    map_dict = {}
+    i = lmag
+
+    while i < hmag:
+        map_dict[round(i+interval,3)] = str(i) + '--' + str(i + interval)
+        i += interval
+        i = round(i,3)
+        # result_dict[i] = []
+        result_dict[i] = 0
 
     try:
         conn = db.connect(DB_CONNECTION_STRING)
         cursor = conn.cursor()
-        sql = '''SELECT "mag", "time" FROM EARTHQUAKE WHERE "mag" BETWEEN ? AND ?'''
+        sql = '''SELECT "mag", "time" FROM QUAKES WHERE "mag" BETWEEN ? AND ?'''
         cursor.execute(sql, (lmag, hmag))
         result = cursor.fetchall()
         conn.close()
     except:
         error = "error try again"
 
-    result_dict = {}
-
     for r in result:
-        i = 0
+        i = lmag + interval
         while i <= hmag:
-            i = i + interval
-            i = round(i, 3)
-            print "i is: ", i
-            if r[0] < i:
-                print "r is: ", r[0]
-                if i in result_dict:
-                    # result_dict[i].append(r)
-                    result_dict[i] = result_dict[i] + 1
-                    break
-                # result_dict[i] = [r]
-                result_dict[i] = 1
+            if r[0] <= i:
+                # result_dict[i].append(r)
+                result_dict[i] += 1
                 break
+            i += interval
+            i  = round(i,3)
 
-    return render_template('clusturing.html', result_dict=result_dict, error=error)
+    return render_template('clusturing.html', result_dict = result_dict, map_dict = map_dict)
 
 
 @queriesController.route('/timed', methods=['GET'])
 def timed():
-    return render_template('clusturing.html', )
+    return render_template('timed.html', )
 
 
 @queriesController.route('/timedExecute', methods=['GET'])
 def timedExecute():
-    # lmag = request.args['lmag']
-    # hmag = request.args['hmag']
-    # time = request.args['time']
+    sdate = request.args['sdate']
+    edate = request.args['edate']
+    stime = request.args['stime']
+    etime = request.args['etime']
+
+    stime = datetime.strptime(sdate + stime, "%Y-%m-%d%H:%M:%S")
+    etime = datetime.strptime(edate + etime, "%Y-%m-%d%H:%M:%S")
+
+    result = []
 
     try:
         conn = db.connect(DB_CONNECTION_STRING)
         cursor = conn.cursor()
-        sql = '''SELECT "mag", "time" FROM EARTHQUAKE WHERE "mag" BETWEEN ? AND ?'''
-        cursor.execute(sql, )
+        sql = '''SELECT "n_time", "place" FROM QUAKES
+        WHERE "n_time" BETWEEN ? AND ?'''
+        cursor.execute(sql, (stime, etime))
         result = cursor.fetchall()
         conn.close()
     except:
         error = "error try again"
 
-    return render_template('clusturing.html', error=error)
+    locations = []
+    for r in result:
+        if stime.time() < r[0].time() < etime.time():
+            locations.append([r[0], r[1]])
+
+    return render_template('timed.html', locations=locations)
+
 
 @queriesController.route('/radius', methods=['GET'])
 def radius():
@@ -219,7 +232,7 @@ def radiusExecute():
         conn = db.connect(DB_CONNECTION_STRING)
         cursor = conn.cursor()
         sql = '''SELECT "latitude", "longitude", "place" FROM QUAKES'''
-        cursor.execute(sql,)
+        cursor.execute(sql, )
         result = cursor.fetchall()
         conn.close()
     except:
@@ -235,109 +248,76 @@ def radiusExecute():
         distance = int(geodesic(first, second).miles)
         if distance <= radius:
             count[0] += 1
-            places.append([r[2],distance])
+            places.append([r[2], distance])
 
     print count
 
-    return render_template('radius.html', count = count, places = places)
+    return render_template('radius.html', count=count, places=places)
 
 
-def time_zone_basic():
-    tf = timezonefinder.TimezoneFinder()
-    timezone_str = tf.certain_timezone_at(lat=49.2827, lng=-123.1207)
+@queriesController.route('/north', methods=['GET'])
+def north():
+    return render_template('north.html', )
 
-    if timezone_str is None:
-        print "Could not determine the time zone"
-    else:
-        timezone = pytz.timezone(timezone_str)
-        date_str = "2014-05-28 22:28:15"
-        dt = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
-        print dt
-        print "The time in %s is %s" % (timezone_str, dt + timezone.utcoffset(dt))
 
-def create_column_in_table():
-    conn = db.connect(DB_CONNECTION_STRING)
-    cursor = conn.cursor()
-    sql = '''ALTER TABLE EARTHQUAKE
-          ADD COLUMN "local_time"
-          TIME'''
-    cursor.execute(sql, )
-    conn.commit()
+@queriesController.route('/northExecute', methods=['GET'])
+def northExecute():
+    lat = request.args['lat']
+    lat = lat.encode('utf-8')
+    long = request.args['long']
+    long = long.encode('utf-8')
+    # lat = "32.735687°N"
+    # long = "97.1080656°W"
 
-def set_polarity():
-    conn = db.connect(DB_CONNECTION_STRING)
-    cursor = conn.cursor()
-    sql = '''SELECT "polarity","locationSource" FROM QUAKES WHERE "locationSource" = 'ak' '''
-    cursor.execute(sql, )
-    result1 = cursor.fetchall()
-    print result1
+    lat_tokens = lat.split('°')
+    if lat_tokens[1] == 'S':
+        lat_tokens[0] = (-1) * float(lat_tokens[0])
 
-    sql = '''SELECT "polarity","locationSource" FROM QUAKES WHERE "locationSource" = 'at' '''
-    cursor.execute(sql, )
-    result3 = cursor.fetchall()
-    print result3
+    long_tokens = long.split('°')
+    if long_tokens[1] == 'W':
+        long_tokens[0] = (-1) * float(long_tokens[0])
 
-    sql = '''SELECT "polarity","locationSource" FROM QUAKES WHERE "locationSource" = 'ci' '''
-    cursor.execute(sql, )
-    result4 = cursor.fetchall()
-    print result4
+    print lat_tokens[0]
+    print long_tokens[0]
 
-    sql = '''SELECT "polarity","locationSource" FROM QUAKES WHERE "locationSource" = 'hv' '''
-    cursor.execute(sql, )
-    result5 = cursor.fetchall()
-    print result5
+    result = []
 
-    sql = '''SELECT "polarity","locationSource" FROM QUAKES WHERE "locationSource" = 'id' '''
-    cursor.execute(sql, )
-    result6 = cursor.fetchall()
-    print result6
+    try:
+        conn = db.connect(DB_CONNECTION_STRING)
+        cursor = conn.cursor()
+        sql = '''SELECT "latitude", "longitude", "place" FROM QUAKES
+            WHERE "latitude" = ? AND "longitude" = ?'''
+        cursor.execute(sql,(lat_tokens[0],long_tokens[0]))
+        result = cursor.fetchall()
+        conn.close()
+    except:
+        error = "error try again"
 
-    sql = '''SELECT "polarity","locationSource" FROM QUAKES WHERE "locationSource" = 'mb' '''
-    cursor.execute(sql, )
-    result7 = cursor.fetchall()
-    print result7
+    print result
+    return render_template('north.html', result = result)
 
-    sql = '''SELECT "polarity","locationSource" FROM QUAKES WHERE "locationSource" = 'nc' '''
-    cursor.execute(sql, )
-    result8 = cursor.fetchall()
-    print result8
 
-    sql = '''SELECT "polarity","locationSource" FROM QUAKES WHERE "locationSource" = 'nm' '''
-    cursor.execute(sql, )
-    result9 = cursor.fetchall()
-    print result9
+@queriesController.route('/polarity', methods=['GET'])
+def polarity():
+    return render_template('polarity.html', )
 
-    sql = '''SELECT "polarity","locationSource" FROM QUAKES WHERE "locationSource" = 'nn' '''
-    cursor.execute(sql, )
-    result9 = cursor.fetchall()
-    print result9
 
-    sql = '''SELECT "polarity","locationSource" FROM QUAKES WHERE "locationSource" = 'pr' '''
-    cursor.execute(sql, )
-    result9 = cursor.fetchall()
-    print result9
+@queriesController.route('/polarityExecute', methods=['GET'])
+def polarityExecute():
+    mag = request.args['mag']
+    polarity = request.args['polarity']
 
-    sql = '''SELECT "polarity","locationSource" FROM QUAKES WHERE "locationSource" = 'pt' '''
-    cursor.execute(sql, )
-    result9 = cursor.fetchall()
-    print result9
+    result = []
 
-    sql = '''SELECT "polarity","locationSource" FROM QUAKES WHERE "locationSource" = 'se' '''
-    cursor.execute(sql, )
-    result9 = cursor.fetchall()
-    print result9
+    try:
+        conn = db.connect(DB_CONNECTION_STRING)
+        cursor = conn.cursor()
+        sql = '''SELECT "place", "mag" FROM QUAKES
+            WHERE "mag" > ? AND "polarity" = ? '''
+        cursor.execute(sql, (mag, polarity,))
+        result = cursor.fetchall()
+        conn.close()
+    except:
+        error = "error try again"
 
-    sql = '''SELECT "polarity","locationSource" FROM QUAKES WHERE "locationSource" = 'us' '''
-    cursor.execute(sql, )
-    result9 = cursor.fetchall()
-    print result9
-
-    sql = '''SELECT "polarity","locationSource" FROM QUAKES WHERE "locationSource" = 'uu' '''
-    cursor.execute(sql, )
-    result9 = cursor.fetchall()
-    print result9
-
-    sql = '''SELECT "polarity","locationSource" FROM QUAKES WHERE "locationSource" = 'uw' '''
-    cursor.execute(sql, )
-    result9 = cursor.fetchall()
-    print result9
+    return render_template('polarity.html', result = result)

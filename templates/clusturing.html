@@ -12,7 +12,7 @@
 {% endif %}
 {% if result_dict %}
     {% for key in result_dict %}
-        <span>For </span>{{ key }}
+        <span>Between </span>{{ map_dict[key] }}
         <span>: number of earthquakes were: </span>{{ result_dict[key] }}<br>
     {% endfor %}
 {% endif %}

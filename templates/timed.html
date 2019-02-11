@@ -1,8 +1,15 @@
 {% include 'common.html' %}
 
-<form action="clusturingExecute" method="get">
-    <input  name="lmag" placeholder="lower magnitude">
-    <input  name="hmag" placeholder="higher magnitude">
-    <input  name="time" placeholder="time">
+<form action="timedExecute" method="get">
+    <input  name="sdate" placeholder="yyyy-mm-dd">
+    <input  name="stime" placeholder="hh:mm:ss"><br>
+    <input  name="edate" placeholder="yyyy-mm-dd">
+    <input  name="etime" placeholder="hh:mm:ss">
     <input type="submit" value="Get Time" class="w3-red w3-button">
 </form>
+
+{% if locations %}
+    {% for r in locations %}
+        On {{ r[0] }} at {{ r[1] }}<br>
+    {% endfor %}
+{% endif %}

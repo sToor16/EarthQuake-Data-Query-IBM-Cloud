@@ -1,0 +1,13 @@
+{% include 'common.html' %}
+
+<form action="polarityExecute" method="get">
+    <input name="mag" placeholder="magnitude">
+    <input name="polarity" placeholder="polarity">
+    <input type="submit" value="Get Locations" class="w3-red w3-button">
+</form>
+
+{% if result %}
+    {% for r in result %}
+        At {{ r[0] }} of mag {{ r[1] }}<br>
+    {% endfor %}
+{% endif %}

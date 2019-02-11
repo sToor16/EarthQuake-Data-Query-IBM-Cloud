@@ -1,0 +1,13 @@
+{% include 'common.html' %}
+
+<form action="northExecute" method="get">
+    <input name="lat" placeholder="latitude">
+    <input name="long" placeholder="longitude">
+    <input type="submit" value="Get Top 5" class="w3-red w3-button">
+</form>
+
+{% if result %}
+    {% for r in result %}
+        {{ r[2] }}<br>
+    {% endfor %}
+{% endif %}
