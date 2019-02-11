@@ -1,0 +1,13 @@
+{% include 'common.html' %}
+
+<form action="theoryExecute" method="get">
+    <span>More Earthquaked between</span>
+    <input name="stime" placeholder="hh:mm:ss">
+    <input name="etime" placeholder="hh:mm:ss">
+    <input type="submit" value="answer" class="w3-red w3-button">
+</form>
+
+{% if count %}
+    {{ count[0] }}<br>
+    {{ count[1] }}
+{% endif %}

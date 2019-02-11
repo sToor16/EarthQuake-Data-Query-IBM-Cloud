@@ -1,0 +1,17 @@
+{% include 'common.html' %}
+
+<form action="radiusExecute" method="get">
+    <input required name="lat" placeholder="latitude">
+    <input required name="long" placeholder="longitude">
+    <input required name="radius" placeholder="radius">
+    <input type="submit" value="Get Magnitudes" class="w3-red w3-button">
+</form>
+
+{% if count %}
+    {{ count[0] }}<br><br>
+{% endif %}
+{% if places %}
+    {%  for place in places %}
+        {{ place[1] }} miles away at {{ place[0] }}<br>
+    {% endfor %}
+{% endif %}
